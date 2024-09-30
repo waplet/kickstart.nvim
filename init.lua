@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -157,6 +157,19 @@ vim.opt.cursorline = true
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.opt.scrolloff = 10
 
+-- -- Fold amount
+-- -- vim.opt.foldcolumn = 1
+-- vim.opt.foldmethod = 'syntax'
+-- vim.opt.foldcolumn = '1'
+
+-- Whichwrap
+vim.opt.whichwrap = 'h,l,<,>'
+
+-- Indentation
+vim.opt.shiftwidth = 4
+vim.opt.expandtab = true
+vim.opt.softtabstop = 4
+
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
 
@@ -166,6 +179,9 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
+
+-- Require custom keymaps
+require 'custom.config.keymaps'
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
@@ -193,6 +209,24 @@ vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper win
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
+-- From vim defaults.vim
+-- --
+-- When editing a file, always jump to the last known cursor position.
+-- Don't do it when the position is invalid, when inside an event handler
+-- (happens when dropping a file on gvim) and for a commit message (it's
+-- likely a different one than last time).
+vim.api.nvim_create_autocmd('BufReadPost', {
+  group = vim.api.nvim_create_augroup('w-remember-position', {}),
+  callback = function(args)
+    local valid_line = vim.fn.line [['"]] >= 1 and vim.fn.line [['"]] < vim.fn.line '$'
+    local not_commit = vim.b[args.buf].filetype ~= 'commit'
+
+    if valid_line and not_commit then
+      vim.cmd [[normal! g`"]]
+    end
+  end,
+})
+
 -- Highlight when yanking (copying) text
 --  Try it with `yap` in normal mode
 --  See `:help vim.highlight.on_yank()`
@@ -203,6 +237,18 @@ vim.api.nvim_create_autocmd('TextYankPost', {
     vim.highlight.on_yank()
   end,
 })
+
+-- vim.api.nvim_create_autocmd({ 'FileType' }, {
+--   callback = function()
+--     if require('nvim-treesitter.parsers').has_parser() then
+--       vim.opt.foldmethod = 'expr'
+--       vim.opt.foldexpr = 'nvim_treesitter#foldexpr()'
+--     else
+--       vim.opt.foldmethod = 'syntax'
+--     end
+--     vim.cmd [[ set nofoldenable ]]
+--   end,
+-- })
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -389,8 +435,23 @@ require('lazy').setup({
         -- },
         -- pickers = {}
         extensions = {
+          file_browser = {
+            grouped = true,
+            hidden = true,
+            display_stat = false,
+            mappings = {
+              ['i'] = {
+                --
+              },
+            },
+          },
           ['ui-select'] = {
             require('telescope.themes').get_dropdown(),
+          },
+        },
+        pickers = {
+          find_files = {
+            no_ignore = true,
           },
         },
       }
@@ -398,12 +459,38 @@ require('lazy').setup({
       -- Enable Telescope extensions if they are installed
       pcall(require('telescope').load_extension, 'fzf')
       pcall(require('telescope').load_extension, 'ui-select')
+      pcall(require('telescope').load_extension, 'telescope-file-browser')
+      -- Fix telescope find files so it's toggleable with <C-h>
+      local my_find_files
+      my_find_files = function(opts, no_ignore)
+        opts = opts or {}
+        no_ignore = vim.F.if_nil(no_ignore, false)
+        opts.attach_mappings = function(_, map)
+          map({ 'n', 'i' }, '<C-h>', function(prompt_bufnr) -- <C-h> to toggle modes
+            local prompt = require('telescope.actions.state').get_current_line()
+            require('telescope.actions').close(prompt_bufnr)
+            no_ignore = not no_ignore
+            my_find_files({ default_text = prompt }, no_ignore)
+          end)
+          return true
+        end
+
+        if no_ignore then
+          opts.no_ignore = true
+          opts.hidden = true
+          opts.prompt_title = 'Find Files <ALL>'
+          require('telescope.builtin').find_files(opts)
+        else
+          opts.prompt_title = 'Find Files'
+          require('telescope.builtin').find_files(opts)
+        end
+      end
 
       -- See `:help telescope.builtin`
       local builtin = require 'telescope.builtin'
       vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
       vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps' })
-      vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
+      vim.keymap.set('n', '<leader>sf', my_find_files, { desc = '[S]earch [F]iles' })
       vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
       vim.keymap.set('n', '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
       vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
@@ -436,9 +523,12 @@ require('lazy').setup({
       end, { desc = '[S]earch [N]eovim files' })
     end,
   },
-
-  -- LSP Plugins
   {
+    'nvim-telescope/telescope-file-browser.nvim',
+    dependencies = { 'nvim-telescope/telescope.nvim', 'nvim-lua/plenary.nvim' },
+  },
+  {
+    -- LSP Plugins
     -- `lazydev` configures Lua LSP for your Neovim config, runtime and plugins
     -- used for completion, annotations and signatures of Neovim apis
     'folke/lazydev.nvim',
@@ -671,12 +761,12 @@ require('lazy').setup({
     cmd = { 'ConformInfo' },
     keys = {
       {
-        '<leader>f',
+        '<leader>ff',
         function()
           require('conform').format { async = true, lsp_format = 'fallback' }
         end,
         mode = '',
-        desc = '[F]ormat buffer',
+        desc = '[F]ormat file',
       },
     },
     opts = {
@@ -875,12 +965,19 @@ require('lazy').setup({
       -- cursor location to LINE:COLUMN
       ---@diagnostic disable-next-line: duplicate-set-field
       statusline.section_location = function()
-        return '%2l:%-2v'
+        return '%2l:%-2v %{getcwd()}'
       end
 
       -- ... and there is more!
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
+  },
+  {
+    'folke/persistence.nvim',
+    event = 'BufReadPre', -- this will only start session saving when an actual file was opened
+    opts = {
+      -- add any custom options here
+    },
   },
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
@@ -918,18 +1015,18 @@ require('lazy').setup({
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
   -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
+  require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
 }, {
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the
@@ -952,5 +1049,37 @@ require('lazy').setup({
   },
 })
 
+local starter = require 'mini.starter'
+local my_items = {
+  { name = 'Restore Session', action = ':lua require("persistence").load()', section = 'Sessions' },
+  { name = 'Restore Previous Session', action = ':lua require("persistence").load({ last = true })', section = 'Sessions' },
+  starter.sections.recent_files(5, false),
+  -- starter.sections.recent_files(5, true),
+  starter.sections.builtin_actions(),
+}
+
+starter.setup {
+  autoopen = true,
+  evaluate_single = true,
+  items = my_items,
+  header = [[
+
+██╗    ██╗ █████╗ ██████╗ ██╗     ███████╗████████╗
+██║    ██║██╔══██╗██╔══██╗██║     ██╔════╝╚══██╔══╝
+██║ █╗ ██║███████║██████╔╝██║     █████╗     ██║   
+██║███╗██║██╔══██║██╔═══╝ ██║     ██╔══╝     ██║   
+╚███╔███╔╝██║  ██║██║     ███████╗███████╗   ██║   
+ ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝     ╚══════╝╚══════╝   ╚═╝   
+                                                   
+ ]],
+  content_hooks = {
+    starter.gen_hook.adding_bullet(),
+    starter.gen_hook.indexing('all', { 'Builtin actions', 'Telescope' }),
+    starter.gen_hook.padding(5, 2),
+    starter.gen_hook.aligning('center', 'center'),
+  },
+}
+
+require 'custom.config.nvim-ufo'
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
