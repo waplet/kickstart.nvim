@@ -15,7 +15,7 @@ vim.keymap.set('n', '[t', '<cmd>:tabp<CR>', { silent = true, desc = '[w]Switch p
 vim.keymap.set('n', '<leader>cb', function()
   local file = vim.fn.expand '%' -- Get the current file name
   local first_line = vim.fn.getline(1) -- Get the first line of the file
-  if string.match(first_line, '^#!/') then -- If first line contains shebang
+  if string.match(first_line, '^#!/?') then -- If first line contains shebangkeyma
     local escaped_file = vim.fn.shellescape(file) -- Properly escape the file name for shell commands
 
     -- Execute the script on a tmux pane on the right. On my mac I use zsh, so
@@ -85,3 +85,8 @@ end, { desc = '[W]Write current file' })
 vim.keymap.set('n', '<leader>fr', '<cmd>retab<CR>', { silent = false, desc = '[w]Reindent file' })
 
 vim.keymap.set('n', '\\', ':Telescope file_browser<CR>')
+
+-- Change working directory to the current open file
+vim.keymap.set('n', '<leader>wc', function()
+  vim.cmd('cd' .. vim.fn.expand '%:p:h')
+end, { desc = '[c]Change working directory to the one of buffer' })

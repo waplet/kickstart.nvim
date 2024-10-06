@@ -181,7 +181,7 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
 -- Require custom keymaps
-require 'custom.config.keymaps'
+-- require 'custom.config.keymaps'
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
@@ -236,6 +236,23 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   callback = function()
     vim.highlight.on_yank()
   end,
+})
+
+-- Persistent fold
+local save_fold = vim.api.nvim_create_augroup('Persistent Folds', { clear = true })
+vim.api.nvim_create_autocmd('BufWinLeave', {
+  pattern = '*.*',
+  callback = function()
+    vim.cmd.mkview()
+  end,
+  group = save_fold,
+})
+vim.api.nvim_create_autocmd('BufWinEnter', {
+  pattern = '*.*',
+  callback = function()
+    vim.cmd.loadview { mods = { emsg_silent = true } }
+  end,
+  group = save_fold,
 })
 
 -- vim.api.nvim_create_autocmd({ 'FileType' }, {
@@ -490,7 +507,7 @@ require('lazy').setup({
       local builtin = require 'telescope.builtin'
       vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
       vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps' })
-      vim.keymap.set('n', '<leader>sf', my_find_files, { desc = '[S]earch [F]iles' })
+      vim.keymap.set('n', '<leader>sf', my_find_files, { desc = '[S]earch [F]iles (cwd)' })
       vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
       vim.keymap.set('n', '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
       vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
@@ -985,7 +1002,31 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = {
+        'bash',
+        'c',
+        'diff',
+        'html',
+        'lua',
+        'luadoc',
+        'markdown',
+        'markdown_inline',
+        'query',
+        'vim',
+        'vimdoc',
+        'php',
+        'csv',
+        'dockerfile',
+        'go',
+        'json',
+        'php',
+        'php_only',
+        'python',
+        'regex',
+        'sql',
+        'ssh_config',
+        'yaml',
+      },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -1080,6 +1121,6 @@ starter.setup {
   },
 }
 
-require 'custom.config.nvim-ufo'
+require 'custom.config'
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
