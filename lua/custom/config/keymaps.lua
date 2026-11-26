@@ -90,3 +90,6 @@ vim.keymap.set('n', '\\', ':Telescope file_browser<CR>')
 vim.keymap.set('n', '<leader>wc', function()
   vim.cmd('cd' .. vim.fn.expand '%:p:h')
 end, { desc = '[c]Change working directory to the one of buffer' })
+
+vim.keymap.set('v', '<leader>yy', '"+y', { desc = '[w] Copy' })
+vim.keymap.set('n', '<leader>pp', '"+gP', { desc = '[w] Paste' })
